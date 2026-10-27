@@ -18,10 +18,6 @@ final class Controller {
         feed.start()
         // Dragging a window by hand is no AeroSpace event: follow the pointer's drags (these monitors need no permission).
         NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { [weak self] _ in self?.refresh() }
-        // A click, or an app coming to the front, can raise the focused window above the border (Ghostty does): order the
-        // border above it again once the raise has landed.
-        NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in self?.scheduleBurst() }
-        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
     }
@@ -36,17 +32,17 @@ final class Controller {
     private func scheduleBurst() {
         burst.forEach { $0.cancel() }
         burst = Burst.delays.dropFirst().map { delay in
-            let item = DispatchWorkItem { [weak self] in self?.refresh(reassert: true) }
+            let item = DispatchWorkItem { [weak self] in self?.refresh() }
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
             return item
         }
-        refresh(reassert: true)
+        refresh()
     }
 
     /// DOTBORDER_DEBUG=1 prints every decision with its time and the frame read, to see what the border did and when.
     private static let debug = ProcessInfo.processInfo.environment["DOTBORDER_DEBUG"] != nil
 
-    private func refresh(reassert: Bool = false) {
+    private func refresh() {
         let frame = focused.flatMap(Controller.frame(of:))
         let command = model.update(window: focused, frame: frame, screens: Controller.screens())
         if Controller.debug, command != .none {
@@ -55,10 +51,9 @@ final class Controller {
         switch command {
         case .none: break
         case .hide: border.hide()
-        case .show(let frame, let fade): if let focused { border.show(frame, above: focused, fade: fade) }
-        case .move(let frame): if let focused { border.move(frame, above: focused) }
+        case .show(let frame, let fade): border.show(frame, fade: fade)
+        case .move(let frame): border.move(frame)
         }
-        if reassert, model.visible, let focused { border.reassert(above: focused) }
     }
 
     /// The window's frame on screen, CoreGraphics coordinates; asking for one window by id is cheap.

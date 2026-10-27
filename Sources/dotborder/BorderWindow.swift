@@ -2,13 +2,12 @@ import AppKit
 import DotborderCore
 
 /// The border: one click-through window with a rounded outline centered on the focused window's edge (half of it over the
-/// window, half outside, as JankyBorders draws it), placed just above that window. A frame change is a
-/// `setFrame` and nothing else; the layer draws the outline once.
+/// window, half outside, as JankyBorders draws it), kept above the normal windows (a window level, so there is no
+/// order to keep in step with AeroSpace). A frame change is a `setFrame` and nothing else; the layer draws the outline once.
 final class BorderWindow {
     private let window: NSWindow
     private let config: Config
     private var generation = 0
-    private(set) var orderedAbove: UInt32?
 
     init(config: Config) {
         self.config = config
@@ -18,7 +17,9 @@ final class BorderWindow {
         window.hasShadow = false
         window.ignoresMouseEvents = true
         window.isReleasedWhenClosed = false
-        window.level = .normal
+        // Above every normal window: ordering the border relative to the focused window raced with AeroSpace and WindowServer
+        // (fast workspace switches left it below the window for hundreds of milliseconds).
+        window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         let view = NSView(frame: .zero)
         view.wantsLayer = true
@@ -32,12 +33,12 @@ final class BorderWindow {
         window.contentView = view
     }
 
-    /// Shows the border around `frame` (CoreGraphics coordinates), above the window with that id.
-    func show(_ frame: CGRect, above windowID: UInt32, fade: Bool) {
+    /// Shows the border around `frame` (CoreGraphics coordinates).
+    func show(_ frame: CGRect, fade: Bool) {
         generation += 1
         place(frame)
         window.alphaValue = fade && config.fadeIn > 0 ? 0 : 1
-        order(above: windowID)
+        window.orderFrontRegardless()
         guard fade, config.fadeIn > 0 else { return }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = config.fadeIn
@@ -46,34 +47,32 @@ final class BorderWindow {
         }
     }
 
-    func move(_ frame: CGRect, above windowID: UInt32) {
+    func move(_ frame: CGRect) {
+        generation += 1
         place(frame)
-        if orderedAbove != windowID { order(above: windowID) }
     }
 
+    /// Hides the border after a short grace: a workspace switch parks the old window before AeroSpace reports the new focus,
+    /// and under load that report can lag by hundreds of milliseconds. A `show` or `move` in the meantime cancels the hide.
     func hide() {
         generation += 1
-        // Cancels a fade that is still running: the border must not come back after it was hidden.
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0
-            window.animator().alphaValue = 0
+        let pending = generation
+        DispatchQueue.main.asyncAfter(deadline: .now() + BorderWindow.hideGrace) { [weak self] in
+            guard let self, self.generation == pending else { return }
+            // Cancels a fade that is still running: the border must not come back after it was hidden.
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                self.window.animator().alphaValue = 0
+            }
+            self.window.orderOut(nil)
         }
-        window.orderOut(nil)
-        orderedAbove = nil
     }
 
-    /// Puts the border above that window again. The first order, sent as the window arrives, can land before the window is
-    /// composed and then holds nothing: the burst of reads repeats it until the window has settled.
-    func reassert(above windowID: UInt32) { order(above: windowID) }
+    private static let hideGrace: TimeInterval = 0.25
 
     private func place(_ frame: CGRect) {
         let primary = NSScreen.screens.first?.frame.height ?? 0
         let outer = Geometry.appKit(Geometry.outset(frame, by: config.width / 2), primaryHeight: primary)
         window.setFrame(outer, display: false)
-    }
-
-    private func order(above windowID: UInt32) {
-        window.order(.above, relativeTo: Int(windowID))
-        orderedAbove = windowID
     }
 }

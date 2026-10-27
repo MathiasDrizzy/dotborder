@@ -12,8 +12,9 @@ You maintain `dotborder`, a Swift focus border for AeroSpace on macOS. Read `REA
 
 - AeroSpace's window ids are CoreGraphics window ids; a window's frame comes from `CGWindowListCopyWindowInfo([.optionIncludingWindow], id)`, no permission needed.
 - AeroSpace parks the windows of hidden workspaces in a screen corner: a window is "shown" when a third of it is on a screen.
-- `NSWindow.order(.above, relativeTo:)` sent as a window arrives can land before it is composed and then holds nothing: repeat it on every read of the burst.
-- Another window with the very same frame is still a change (the border must be ordered above it), so the model compares window ids too.
+- Ordering the border relative to the focused window (`order(.above, relativeTo:)`) raced with AeroSpace and WindowServer: it landed before the window was composed, or the app re-raised its window (Ghostty on a click), and the border stayed below for hundreds of milliseconds. The border is a `.floating` window level instead, and the burst of reads only follows the frame.
+- Under fast switching WindowServer is saturated: calls like `CGWindowListCopyWindowInfo` and `order` can block the main thread for 300-500 ms (`sample <pid>` shows `SLSConnectionSynchronizeSLSCATransaction`). Hiding waits 250 ms so a late focus event does not leave the window without a border.
+- Another window with the very same frame is still a change, so the model compares window ids too.
 - The outline is centered on the window's edge (half over the window), like JankyBorders.
 - Measure visual changes: record with `screencapture -v -V 9 file.mov`, analyze frames with ffmpeg. Single-frame blips of the metric are noise; compare against JankyBorders with the same script and look at gaps of 30 ms or more.
 - Never start `borders` (or any daemon) in the foreground of a shell: it stays running and blocks the shell.
