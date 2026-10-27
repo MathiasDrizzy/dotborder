@@ -18,6 +18,7 @@ func check(_ name: String, _ condition: Bool, _ detail: @autoclosure () -> Strin
 
 let defaults = Config(arguments: [])
 check("defaults: pink, 2 pt, rounded", defaults.color == 0xccb4_8efa && defaults.width == 2 && defaults.radius > 0)
+check("the border appears at once by default: a fade left 270 ms gaps at fast workspace switches", defaults.fadeIn == 0)
 let custom = Config(arguments: ["active_color=0xff00ff00", "width=3.5", "radius=9", "fade_in=200"])
 check("arguments override the defaults", custom.color == 0xff00_ff00 && custom.width == 3.5 && custom.radius == 9 && custom.fadeIn == 0.2)
 let sloppy = Config(arguments: ["width=abc", "nope", "radius=-4", "fade_in=99999", "active_color=zz"])

@@ -7,8 +7,9 @@ public struct Config: Sendable, Equatable {
     public var width: Double = 2
     /// Corner radius of the window the border follows, in points (the outline's outer edge is this plus half its width).
     public var radius: Double = 14
-    /// Seconds a border takes to appear on a window that just arrived.
-    public var fadeIn: Double = 0.12
+    /// Seconds a border takes to appear on a window that just arrived. Off by default: a fade left the window without a
+    /// visible border for 270-300 ms at each fast workspace switch (measured at 60 fps).
+    public var fadeIn: Double = 0
 
     public init(arguments: [String]) {
         for argument in arguments {
