@@ -18,6 +18,10 @@ final class Controller {
         feed.start()
         // Dragging a window by hand is no AeroSpace event: follow the pointer's drags (these monitors need no permission).
         NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { [weak self] _ in self?.refresh() }
+        // A click, or an app coming to the front, can raise the focused window above the border (Ghostty does): order the
+        // border above it again once the raise has landed.
+        NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in self?.scheduleBurst() }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
     }
