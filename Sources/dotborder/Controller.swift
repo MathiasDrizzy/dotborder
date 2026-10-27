@@ -8,6 +8,7 @@ final class Controller {
     private var model = BorderModel()
     private var focused: UInt32?
     private var burst: [DispatchWorkItem] = []
+    private var watcher: DispatchSourceTimer?
     private lazy var feed = AeroSpaceFeed(
         onEvent: { [weak self] event in self?.handle(event) },
         onLost: { [weak self] in self?.focused = nil; self?.refresh() })
@@ -19,6 +20,10 @@ final class Controller {
         // Dragging a window by hand is no AeroSpace event: follow the pointer's drags (these monitors need no permission).
         NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { [weak self] _ in self?.refresh() }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
+        // An app quitting or hiding takes its windows with it, with no AeroSpace event: read again at once.
+        for name in [NSWorkspace.didTerminateApplicationNotification, NSWorkspace.didHideApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
+        }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.scheduleBurst() }
     }
 
@@ -58,6 +63,18 @@ final class Controller {
         case .show(let frame, let fade): border.show(frame, fade: fade)
         case .move(let frame): border.move(frame)
         }
+        watchWhileVisible()
+    }
+
+    /// Reads the window again at a slow pace while the border is shown (see `Burst.watchInterval`); stops as soon as it is not.
+    private func watchWhileVisible() {
+        guard model.visible else { watcher?.cancel(); watcher = nil; return }
+        guard watcher == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + Burst.watchInterval, repeating: Burst.watchInterval, leeway: .milliseconds(20))
+        timer.setEventHandler { [weak self] in self?.refresh() }
+        timer.resume()
+        watcher = timer
     }
 
     /// The window's frame on screen, CoreGraphics coordinates; asking for one window by id is cheap.

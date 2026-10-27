@@ -26,7 +26,8 @@ public struct BorderModel: Sendable {
     public mutating func update(window newWindow: UInt32?, frame newFrame: CGRect?, screens: [CGRect]) -> BorderCommand {
         guard newWindow != nil, let newFrame, Geometry.isShown(newFrame, on: screens) else {
             defer { visible = false; window = nil }
-            return visible ? .hide(grace: newWindow != nil) : .none
+            // A window that is still listed but parked may be about to be replaced; one that is gone from the list is not.
+            return visible ? .hide(grace: newWindow != nil && newFrame != nil) : .none
         }
         defer { visible = true; frame = newFrame; window = newWindow }
         if !visible { return .show(newFrame, fade: true) }
@@ -64,4 +65,10 @@ public enum Burst {
     /// A window takes a moment to reach its place after the event that moved it: it is read again after these delays
     /// (seconds), then left alone. Nothing runs while nothing happens.
     public static let delays: [TimeInterval] = [0, 0.008, 0.02, 0.045, 0.09, 0.16, 0.3]
+
+    /// While a border is shown its window is read again at this interval (seconds). Why a poll at all: an app can close or
+    /// hide its window (Cmd+W in an Electron app) with no AeroSpace event and no notification that needs no permission, and
+    /// the border would stay on screen until something else happened. It runs only while a border is shown; each tick costs a
+    /// wake-up more than the read (about 0.7 ms of CPU, measured), so the interval is what sets the idle cost.
+    public static let watchInterval: TimeInterval = 0.25
 }

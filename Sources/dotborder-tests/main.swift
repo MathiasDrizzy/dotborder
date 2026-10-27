@@ -54,7 +54,7 @@ check("the window leaving the screen hides the border", model.update(window: 8, 
 check("another window with the very same frame is still a change: the border must go above it", { var m = BorderModel(); _ = m.update(window: 1, frame: window, screens: screens); return m.update(window: 2, frame: window, screens: screens) == .move(window) }())
 check("hidden stays hidden", model.update(window: 8, frame: parked, screens: screens) == .none)
 check("a window arriving after a hide fades in", model.update(window: 9, frame: window, screens: screens) == .show(window, fade: true))
-check("the window vanishing hides the border", model.update(window: 9, frame: nil, screens: screens) == .hide(grace: true))
+check("the window vanishing hides the border at once: it is gone from the window list, nothing is about to replace it", model.update(window: 9, frame: nil, screens: screens) == .hide(grace: false))
 check("no focused window hides it at once: an empty workspace has nothing to wait for", { var m = BorderModel(); _ = m.update(window: 1, frame: window, screens: screens); return m.update(window: nil, frame: nil, screens: screens) == .hide(grace: false) }())
 
 // MARK: events from AeroSpace
