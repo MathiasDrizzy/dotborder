@@ -25,7 +25,11 @@ final class Controller {
     func stop() { feed.stop() }
 
     private func handle(_ event: AeroEvent) {
-        if case .focus(let window) = event { focused = window }
+        switch event {
+        case .focus(let window): focused = window
+        case .noFocus: focused = nil
+        case .refresh: break
+        }
         scheduleBurst()
     }
 
@@ -50,7 +54,7 @@ final class Controller {
         }
         switch command {
         case .none: break
-        case .hide: border.hide()
+        case .hide(let grace): border.hide(grace: grace)
         case .show(let frame, let fade): border.show(frame, fade: fade)
         case .move(let frame): border.move(frame)
         }

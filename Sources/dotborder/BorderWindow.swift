@@ -17,6 +17,8 @@ final class BorderWindow {
         window.hasShadow = false
         window.ignoresMouseEvents = true
         window.isReleasedWhenClosed = false
+        // `orderOut` otherwise fades the window out over a quarter of a second: a border left in the air after its window went.
+        window.animationBehavior = .none
         // Above every normal window: ordering the border relative to the focused window raced with AeroSpace and WindowServer
         // (fast workspace switches left it below the window for hundreds of milliseconds).
         window.level = .floating
@@ -52,20 +54,26 @@ final class BorderWindow {
         place(frame)
     }
 
-    /// Hides the border after a short grace: a workspace switch parks the old window before AeroSpace reports the new focus,
-    /// and under load that report can lag by hundreds of milliseconds. A `show` or `move` in the meantime cancels the hide.
-    func hide() {
+    /// Hides the border. With `grace` it waits a moment: a workspace switch parks the old window before AeroSpace reports the
+    /// new focus and, under load, that report can lag by hundreds of milliseconds. A `show` or `move` in the meantime
+    /// cancels the hide.
+    func hide(grace: Bool) {
         generation += 1
+        guard grace else { return orderOut() }
         let pending = generation
         DispatchQueue.main.asyncAfter(deadline: .now() + BorderWindow.hideGrace) { [weak self] in
             guard let self, self.generation == pending else { return }
-            // Cancels a fade that is still running: the border must not come back after it was hidden.
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0
-                self.window.animator().alphaValue = 0
-            }
-            self.window.orderOut(nil)
+            self.orderOut()
         }
+    }
+
+    private func orderOut() {
+        // Cancels a fade that is still running: the border must not come back after it was hidden.
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            window.animator().alphaValue = 0
+        }
+        window.orderOut(nil)
     }
 
     private static let hideGrace: TimeInterval = 0.25

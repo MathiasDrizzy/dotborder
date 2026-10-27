@@ -4,7 +4,9 @@ import Foundation
 /// What to do with the border window.
 public enum BorderCommand: Equatable, Sendable {
     case none
-    case hide
+    /// Hide the border. `grace`: the window is gone from where it was but its replacement may be about to be reported (a
+    /// workspace switch parks the old window first), so the hide waits a moment. Without it there is nothing to wait for.
+    case hide(grace: Bool)
     /// Put the border on the frame and show it, fading in when it was not visible.
     case show(CGRect, fade: Bool)
     /// The border is visible already: follow the window with no animation.
@@ -24,7 +26,7 @@ public struct BorderModel: Sendable {
     public mutating func update(window newWindow: UInt32?, frame newFrame: CGRect?, screens: [CGRect]) -> BorderCommand {
         guard newWindow != nil, let newFrame, Geometry.isShown(newFrame, on: screens) else {
             defer { visible = false; window = nil }
-            return visible ? .hide : .none
+            return visible ? .hide(grace: newWindow != nil) : .none
         }
         defer { visible = true; frame = newFrame; window = newWindow }
         if !visible { return .show(newFrame, fade: true) }
@@ -37,6 +39,8 @@ public struct BorderModel: Sendable {
 public enum AeroEvent: Equatable, Sendable {
     /// The focused window changed (its CoreGraphics window id).
     case focus(window: UInt32)
+    /// The focus went to a workspace with no window.
+    case noFocus
     /// Something that may have moved or resized the focused window: read it again.
     case refresh
 
@@ -46,7 +50,7 @@ public enum AeroEvent: Equatable, Sendable {
               let name = object["_event"] as? String else { return nil }
         switch name {
         case "focus-changed":
-            guard let id = object["windowId"] as? Int, id > 0 else { self = .refresh; return }
+            guard let id = object["windowId"] as? Int, id > 0 else { self = .noFocus; return }
             self = .focus(window: UInt32(id))
         case "focused-workspace-changed", "binding-triggered", "window-detected", "focused-monitor-changed":
             self = .refresh
