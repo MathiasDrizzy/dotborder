@@ -23,7 +23,19 @@ public struct BorderModel: Sendable {
 
     public init() {}
 
-    public mutating func update(window newWindow: UInt32?, frame newFrame: CGRect?, screens: [CGRect]) -> BorderCommand {
+    /// Whether a read of the focused window would change what the border does (it is shown and the window or its frame is
+    /// not the one it follows). The shell asks it to look for an overlay only when it matters.
+    public func changes(window newWindow: UInt32?, frame newFrame: CGRect?) -> Bool {
+        visible && (newWindow != window || newFrame != frame)
+    }
+
+    /// `overlayUp`: Mission Control is on screen. The border is hidden at once and stays hidden, whatever the windows do
+    /// (they shrink into thumbnails), until it closes.
+    public mutating func update(window newWindow: UInt32?, frame newFrame: CGRect?, screens: [CGRect], overlayUp: Bool = false) -> BorderCommand {
+        if overlayUp {
+            defer { visible = false; window = nil }
+            return visible ? .hide(grace: false) : .none
+        }
         guard newWindow != nil, let newFrame, Geometry.isShown(newFrame, on: screens) else {
             defer { visible = false; window = nil }
             // A window that is still listed but parked may be about to be replaced; one that is gone from the list is not.

@@ -9,6 +9,8 @@ final class Controller {
     private var focused: UInt32?
     private var burst: [DispatchWorkItem] = []
     private var watcher: DispatchSourceTimer?
+    /// Mission Control is on screen: the border stays hidden, and the timer keeps running only to see it close.
+    private var overlayUp = false
     private lazy var feed = AeroSpaceFeed(
         onEvent: { [weak self] event in self?.handle(event) },
         onLost: { [weak self] in self?.focused = nil; self?.refresh() })
@@ -53,7 +55,10 @@ final class Controller {
 
     private func refresh() {
         let frame = focused.flatMap(Controller.frame(of:))
-        let command = model.update(window: focused, frame: frame, screens: Controller.screens())
+        // Looking at every window is dearer than reading one: only when it matters (the border is about to change, or it is
+        // waiting for Mission Control to close).
+        if overlayUp || model.changes(window: focused, frame: frame) { overlayUp = Controller.overlayIsUp() }
+        let command = model.update(window: focused, frame: frame, screens: Controller.screens(), overlayUp: overlayUp)
         if Controller.debug, command != .none {
             FileHandle.standardError.write(Data("\(String(format: "%.3f", Date().timeIntervalSince1970.truncatingRemainder(dividingBy: 100))) window=\(focused.map(String.init) ?? "-") frame=\(frame.map { "\($0)" } ?? "nil") -> \(command)\n".utf8))
         }
@@ -68,13 +73,18 @@ final class Controller {
 
     /// Reads the window again at a slow pace while the border is shown (see `Burst.watchInterval`); stops as soon as it is not.
     private func watchWhileVisible() {
-        guard model.visible else { watcher?.cancel(); watcher = nil; return }
+        guard model.visible || overlayUp else { watcher?.cancel(); watcher = nil; return }
         guard watcher == nil else { return }
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + Burst.watchInterval, repeating: Burst.watchInterval, leeway: .milliseconds(20))
         timer.setEventHandler { [weak self] in self?.refresh() }
         timer.resume()
         watcher = timer
+    }
+
+    private static func overlayIsUp() -> Bool {
+        let list = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
+        return Overlay.isUp(windows: list.map { (owner: $0[kCGWindowOwnerName as String] as? String ?? "", layer: $0[kCGWindowLayer as String] as? Int ?? 0) })
     }
 
     /// The window's frame on screen, CoreGraphics coordinates; asking for one window by id is cheap.

@@ -57,6 +57,21 @@ check("a window arriving after a hide fades in", model.update(window: 9, frame: 
 check("the window vanishing hides the border at once: it is gone from the window list, nothing is about to replace it", model.update(window: 9, frame: nil, screens: screens) == .hide(grace: false))
 check("no focused window hides it at once: an empty workspace has nothing to wait for", { var m = BorderModel(); _ = m.update(window: 1, frame: window, screens: screens); return m.update(window: nil, frame: nil, screens: screens) == .hide(grace: false) }())
 
+// MARK: Mission Control
+
+check("Mission Control is up when the WindowManager has its Spaces Bar (layer 14)", Overlay.isUp(windows: [(owner: "Dock", layer: 20), (owner: "WindowManager", layer: 14)]))
+check("or its Expose shield (layer 19)", Overlay.isUp(windows: [(owner: "WindowManager", layer: 19)]))
+check("the everyday event shield, the wallpaper and the Dock alone are not Mission Control", !Overlay.isUp(windows: [(owner: "WindowManager", layer: -2147483603), (owner: "WindowManager", layer: -2147483624), (owner: "Dock", layer: 20)]))
+check("a window of another app at those layers is not either", !Overlay.isUp(windows: [(owner: "Notes", layer: 14), (owner: "Notes", layer: 19)]))
+var overlayModel = BorderModel()
+_ = overlayModel.update(window: 1, frame: window, screens: screens)
+check("Mission Control up hides the border at once", overlayModel.update(window: 1, frame: window.insetBy(dx: 300, dy: 200), screens: screens, overlayUp: true) == .hide(grace: false))
+check("and keeps it hidden while it is up, whatever the window does", overlayModel.update(window: 1, frame: window, screens: screens, overlayUp: true) == .none)
+check("when it closes the border comes back", overlayModel.update(window: 1, frame: window, screens: screens, overlayUp: false) == .show(window, fade: true))
+check("a model asks whether a read changes anything: a new frame does, the same one does not",
+      { var m = BorderModel(); _ = m.update(window: 1, frame: window, screens: screens); return m.changes(window: 1, frame: moved) && !m.changes(window: 1, frame: window) && m.changes(window: 2, frame: window) }())
+check("a hidden model has nothing to change", !BorderModel().changes(window: 1, frame: window))
+
 // MARK: events from AeroSpace
 
 check("focus-changed carries the window", AeroEvent(line: #"{"_event":"focus-changed","windowId":4538,"workspace":"1"}"#) == .focus(window: 4538))
