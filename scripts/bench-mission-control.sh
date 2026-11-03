@@ -17,7 +17,9 @@ set -u
 runs="${1:-3}"
 duration=5
 trigger=1.2
-file="$(mktemp -d)/mc.mov"
+dir="$(mktemp -d)"
+trap 'rm -rf "$dir"' EXIT   # the recording shows the whole screen: do not leave it behind
+file="$dir/mc.mov"
 
 command -v ffmpeg >/dev/null || { echo "ffmpeg is needed" >&2; exit 1; }
 

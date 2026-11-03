@@ -23,10 +23,11 @@ public struct BorderModel: Sendable {
 
     public init() {}
 
-    /// Whether a read of the focused window would change what the border does (it is shown and the window or its frame is
-    /// not the one it follows). The shell asks it to look for an overlay only when it matters.
+    /// Whether a read of the focused window would change what the border does: it is shown and the window or its frame is not
+    /// the one it follows, or it is hidden and a window has come to where it can be shown. The shell asks it to look for an
+    /// overlay only when it matters.
     public func changes(window newWindow: UInt32?, frame newFrame: CGRect?) -> Bool {
-        visible && (newWindow != window || newFrame != frame)
+        visible ? (newWindow != window || newFrame != frame) : (newWindow != nil && newFrame != nil)
     }
 
     /// `overlayUp`: Mission Control is on screen. The border is hidden at once and stays hidden, whatever the windows do
@@ -87,6 +88,9 @@ public enum Burst {
     /// While Mission Control is up the poll only waits for it to close, which takes a few seconds at most: it runs this much
     /// faster, so the border is back a frame or two after the windows are, and the idle cost does not change.
     private static let overlayInterval: TimeInterval = 0.05
+
+    /// Seconds the fast poll lasts: someone who leaves Mission Control open is not waiting for it to close at 20 reads a second.
+    public static let overlayFastSpan: TimeInterval = 3
 
     public static func watchInterval(overlayUp: Bool) -> TimeInterval { overlayUp ? overlayInterval : usualInterval }
 }

@@ -72,7 +72,8 @@ check("a model asks whether a read changes anything: a new frame does, the same 
       { var m = BorderModel(); _ = m.update(window: 1, frame: window, screens: screens); return m.changes(window: 1, frame: moved) && !m.changes(window: 1, frame: window) && m.changes(window: 2, frame: window) }())
 check("while Mission Control is up the window is read much faster than usual, so the border is back a frame or so after it closes", Burst.watchInterval(overlayUp: true) <= 0.06 && Burst.watchInterval(overlayUp: true) < Burst.watchInterval(overlayUp: false))
 check("the usual poll stays slow: it is the idle cost", Burst.watchInterval(overlayUp: false) >= 0.25)
-check("a hidden model has nothing to change", !BorderModel().changes(window: 1, frame: window))
+check("a hidden model changes when a shown window arrives (it could appear over Mission Control), not for nothing", BorderModel().changes(window: 1, frame: window) && !BorderModel().changes(window: nil, frame: nil) && !BorderModel().changes(window: 1, frame: nil))
+check("the fast poll for Mission Control has a span, then it falls back to the slow one", Burst.overlayFastSpan > 0 && Burst.overlayFastSpan <= 10)
 
 // MARK: events from AeroSpace
 

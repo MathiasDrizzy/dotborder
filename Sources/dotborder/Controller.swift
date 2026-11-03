@@ -11,8 +11,9 @@ final class Controller {
     private var watcher: DispatchSourceTimer?
     /// Mission Control is on screen: the border stays hidden, and the timer keeps running only to see it close.
     private var overlayUp = false
-    /// The `overlayUp` the running timer was made for.
-    private var watching: Bool?
+    /// When Mission Control was first seen up, and the pace the running timer was made for (`nil`: no timer).
+    private var overlaySince: Date?
+    private var watchingFast: Bool?
     private lazy var feed = AeroSpaceFeed(
         onEvent: { [weak self] event in self?.handle(event) },
         onLost: { [weak self] in self?.focused = nil; self?.refresh() })
@@ -59,7 +60,11 @@ final class Controller {
         let frame = focused.flatMap(Controller.frame(of:))
         // Looking at every window is dearer than reading one: only when it matters (the border is about to change, or it is
         // waiting for Mission Control to close).
-        if overlayUp || model.changes(window: focused, frame: frame) { overlayUp = Controller.overlayIsUp() }
+        if overlayUp || model.changes(window: focused, frame: frame) {
+            let up = Controller.overlayIsUp()
+            overlaySince = up ? (overlaySince ?? Date()) : nil
+            overlayUp = up
+        }
         let command = model.update(window: focused, frame: frame, screens: Controller.screens(), overlayUp: overlayUp)
         if Controller.debug, command != .none {
             FileHandle.standardError.write(Data("\(String(format: "%.3f", Date().timeIntervalSince1970.truncatingRemainder(dividingBy: 100))) window=\(focused.map(String.init) ?? "-") frame=\(frame.map { "\($0)" } ?? "nil") -> \(command)\n".utf8))
@@ -73,19 +78,20 @@ final class Controller {
         watchWhileVisible()
     }
 
-    /// Reads the window again at a slow pace while the border is shown (see `Burst.watchInterval`), faster while it waits for
-    /// Mission Control to close; stops as soon as it has neither to do.
+    /// Reads the window again at a slow pace while the border is shown (see `Burst.watchInterval`), faster for the first
+    /// seconds of Mission Control, while it waits for it to close; stops as soon as it has neither to do.
     private func watchWhileVisible() {
-        guard model.visible || overlayUp else { watcher?.cancel(); watcher = nil; watching = nil; return }
-        guard watching != overlayUp else { return }
+        guard model.visible || overlayUp else { watcher?.cancel(); watcher = nil; watchingFast = nil; return }
+        let fast = overlaySince.map { Date().timeIntervalSince($0) < Burst.overlayFastSpan } ?? false
+        guard watchingFast != fast else { return }
         watcher?.cancel()
-        let interval = Burst.watchInterval(overlayUp: overlayUp)
+        let interval = Burst.watchInterval(overlayUp: fast)
         let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(overlayUp ? 5 : 20))
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(fast ? 5 : 20))
         timer.setEventHandler { [weak self] in self?.refresh() }
         timer.resume()
         watcher = timer
-        watching = overlayUp
+        watchingFast = fast
     }
 
     private static func overlayIsUp() -> Bool {
