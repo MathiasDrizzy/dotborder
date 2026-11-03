@@ -11,6 +11,8 @@ final class Controller {
     private var watcher: DispatchSourceTimer?
     /// Mission Control is on screen: the border stays hidden, and the timer keeps running only to see it close.
     private var overlayUp = false
+    /// The `overlayUp` the running timer was made for.
+    private var watching: Bool?
     private lazy var feed = AeroSpaceFeed(
         onEvent: { [weak self] event in self?.handle(event) },
         onLost: { [weak self] in self?.focused = nil; self?.refresh() })
@@ -71,15 +73,19 @@ final class Controller {
         watchWhileVisible()
     }
 
-    /// Reads the window again at a slow pace while the border is shown (see `Burst.watchInterval`); stops as soon as it is not.
+    /// Reads the window again at a slow pace while the border is shown (see `Burst.watchInterval`), faster while it waits for
+    /// Mission Control to close; stops as soon as it has neither to do.
     private func watchWhileVisible() {
-        guard model.visible || overlayUp else { watcher?.cancel(); watcher = nil; return }
-        guard watcher == nil else { return }
+        guard model.visible || overlayUp else { watcher?.cancel(); watcher = nil; watching = nil; return }
+        guard watching != overlayUp else { return }
+        watcher?.cancel()
+        let interval = Burst.watchInterval(overlayUp: overlayUp)
         let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + Burst.watchInterval, repeating: Burst.watchInterval, leeway: .milliseconds(20))
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(overlayUp ? 5 : 20))
         timer.setEventHandler { [weak self] in self?.refresh() }
         timer.resume()
         watcher = timer
+        watching = overlayUp
     }
 
     private static func overlayIsUp() -> Bool {

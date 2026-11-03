@@ -70,6 +70,8 @@ check("and keeps it hidden while it is up, whatever the window does", overlayMod
 check("when it closes the border comes back", overlayModel.update(window: 1, frame: window, screens: screens, overlayUp: false) == .show(window, fade: true))
 check("a model asks whether a read changes anything: a new frame does, the same one does not",
       { var m = BorderModel(); _ = m.update(window: 1, frame: window, screens: screens); return m.changes(window: 1, frame: moved) && !m.changes(window: 1, frame: window) && m.changes(window: 2, frame: window) }())
+check("while Mission Control is up the window is read much faster than usual, so the border is back a frame or so after it closes", Burst.watchInterval(overlayUp: true) <= 0.06 && Burst.watchInterval(overlayUp: true) < Burst.watchInterval(overlayUp: false))
+check("the usual poll stays slow: it is the idle cost", Burst.watchInterval(overlayUp: false) >= 0.25)
 check("a hidden model has nothing to change", !BorderModel().changes(window: 1, frame: window))
 
 // MARK: events from AeroSpace

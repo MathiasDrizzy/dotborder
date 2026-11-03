@@ -82,5 +82,11 @@ public enum Burst {
     /// hide its window (Cmd+W in an Electron app) with no AeroSpace event and no notification that needs no permission, and
     /// the border would stay on screen until something else happened. It runs only while a border is shown; each tick costs a
     /// wake-up more than the read (about 0.7 ms of CPU, measured), so the interval is what sets the idle cost.
-    public static let watchInterval: TimeInterval = 0.25
+    private static let usualInterval: TimeInterval = 0.25
+
+    /// While Mission Control is up the poll only waits for it to close, which takes a few seconds at most: it runs this much
+    /// faster, so the border is back a frame or two after the windows are, and the idle cost does not change.
+    private static let overlayInterval: TimeInterval = 0.05
+
+    public static func watchInterval(overlayUp: Bool) -> TimeInterval { overlayUp ? overlayInterval : usualInterval }
 }
