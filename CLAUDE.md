@@ -2,6 +2,8 @@
 
 You maintain `dotborder`, a Swift focus border for AeroSpace on macOS. Read `README.md` first.
 
+**Development only.** The `dotfiles` repository no longer installs or starts dotborder, and nothing runs it day to day. It still needs AeroSpace (events through `aerospace subscribe`) and no feature was removed; keep the measurement notes and `scripts/bench-mission-control.sh` as reference.
+
 ## Layout
 
 - `Sources/DotborderCore`: pure logic, no AppKit: `Config` (arguments), `Geometry` (frames, AeroSpace's parked windows), `BorderModel` (what the border does for each read of the focused window), `AeroEvent` (parsing `aerospace subscribe`), `Burst` (follow-up reads).
@@ -33,4 +35,4 @@ You maintain `dotborder`, a Swift focus border for AeroSpace on macOS. Read `REA
 - Nothing hardcoded to one machine, repository, space or agent name: it must work for anyone.
 - Cost matters more than features: keep idle CPU near zero and RAM small. Prefer events over polling; any polling needs a stated reason and a measured cost. Never leave a background process looping, hung or forgotten.
 - Work on a branch, push it as `ci/<name>` to run CI, merge to `main` only when green. Do not push to `main` untested.
-- The `dotfiles` repository pins this one as a submodule (`mac/tools/<name>`); after merging here, bump the pointer there.
+- The `dotfiles` repository used to pin this one as a submodule (`mac/tools/<name>`) and dropped it when the project became development-only: there is no pointer to bump after merging.

@@ -1,5 +1,7 @@
 # dotborder
 
+> **Development only.** dotborder is no longer installed or started by the author's dotfiles; this repository stays as a development reference, with its measurement notes and `scripts/bench-mission-control.sh`. It needs [AeroSpace](https://github.com/nikitabobko/AeroSpace): it follows the focus through `aerospace subscribe` events, and without AeroSpace it does nothing. Nothing else changed: no feature was removed.
+
 A focus border for [AeroSpace](https://github.com/nikitabobko/AeroSpace) windows on macOS, in Swift (AppKit only, no dependencies). A replacement for JankyBorders that does not flicker when you change workspace.
 
 - **Event-driven.** AeroSpace pushes an event the instant the focus or workspace changes (`aerospace subscribe`); dotborder reads the window's frame (`CGWindowList`, no permission needed), moves one click-through window, kept above the normal windows by its window level.
